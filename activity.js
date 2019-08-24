@@ -645,7 +645,12 @@ function init(){
       }
     });
   for (let i=0; i<allCommands; i++){
-    ge('cell'+i.toString()).onclick = function(){runFast(i); act.selected = i;};
+    ge('cell'+i.toString()).onclick = function(){
+    	if (i<act.program.length){
+    		runFast(i); 
+    		act.selected = i;
+    	}
+    };
   }
 }
 
