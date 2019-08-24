@@ -637,10 +637,16 @@ function init(){
         act.pencil = !act.pencil;
         if (act.pencil){
           ge('cpencil').src = "resource/pencil-on.svg";
-          runFast(act.cmdExec-1);
+          if (act.outofplace){
+          	runFast(act.program.length - 1);
+          }
+          else{
+          	runFast(act.cmdExec-1);
+      	  }
         }
         else{
           ge('cpencil').src = "resource/pencil-off.svg";
+          clearTrace();
         }
       }
     });
