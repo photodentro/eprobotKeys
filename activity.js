@@ -1,5 +1,7 @@
 /*
-Copyright (C) 2019 Dimitris Nikolos <dnikolos@gmail.com>.
+Copyright (C) 2019 
+Alkis Georgopoulos <alkisg@gmail.com>,
+Dimitris Nikolos <dnikolos@gmail.com>.
 SPDX-License-Identifier: CC-BY-SA-4.0*/
 
 function onError(message, source, lineno, colno, error) {
@@ -97,16 +99,25 @@ function onFullScreen(event) {
 
 //--------------------------------------END OF VISUAL----------------------------
 //--------------------------------------START LOGIC------------------------------
-const FD = 0
-const RT = 1
-const BK = 2
-const LT = 3
+const FD = 0;
+const RT = 1;
+const BK = 2;
+const LT = 3;
+
+const UP = 0;
+const DN = 2; //down
+
+const ENDOFPROGRAM = 0;
+const STOP = 1;
+
+const idSuffix = ['fd','rt','bk','lt'];
+
 var act = {};
 var inter,inter1,inter2;
 
 const allCommands = 30;
+
 function showCommand(cmdCode,cell){
-  var idSuffix = ['fd','rt','bk','lt'];
   for (var i=0; i<4; i++){//for all cmdCodes
     if (i==cmdCode){
       ge('cell'+cell.toString()+idSuffix[i]).style.display = '';
@@ -118,12 +129,30 @@ function showCommand(cmdCode,cell){
   }
 }
 
+function eraseCell(cell){
+    for (var i=0; i<4; i++){
+        ge('cell'+cell.toString()+idSuffix[i]).style.display = 'none';
+    }    
+}
+
+function drawProgram(){
+  for (var cell=0; cell<allCommands; cell++){
+  	if (cell<act.program.length){
+  		showCommand(act.program[cell],cell);
+  	}
+  	else{
+  		eraseCell(cell);
+  	}
+  }
+
+}
+
 function highlightCommand(i){
   //highlightCommand(-1) highlights none
   for (var cell = 0; cell<allCommands; cell++){
       ge('cell'+cell.toString()).classList.remove('cellHighlight');
     }
-  if (i!=-1){
+  if (i!=-1 && i<act.program.length){
     cell = i;
     ge('cell'+cell.toString()).classList.add('cellHighlight');
   }
@@ -132,64 +161,37 @@ function highlightCommand(i){
 function bindCommand(cmdName,cmdCode){
   ge(cmdName).onclick = function(event){
     if (!act.play || (act.play && act.pause)){//only add command if not in play
-    if (act.selected==-1){
-      if (act.program.length<allCommands){
-        cell = act.program.length;
-        showCommand(cmdCode,cell);
-        act.program.push(cmdCode);
-      }
-    }
-    else{
-    	cell = act.selected + 1;
-    	act.program.splice(cell,0,cmdCode);//insert cmdCode in index cell
-    	for (var i=cell; i<act.program.length; i++){
-    		showCommand(act.program[i],i);
+    	if (act.selected==-1){//add to end
+      		if (act.program.length<allCommands){
+        		cell = act.program.length;
+        		act.program.push(cmdCode);
+        		showCommand(cmdCode,cell);
+      		}
     	}
-    }
+    	else{
+    		cell = act.selected + 1;//add to next
+    		act.program.splice(cell,0,cmdCode);//insert cmdCode in index cell
+    		drawProgram();
+    	}
+  	}
   }
-}
 }
 
 function deleteProgram(){
   var idSuffix = ['fd','rt','bk','lt'];
+
   act.program = [];
-  for (var cell=act.program.length; cell<allCommands; cell++){
-    for (var i=0; i<4; i++){
-         ge('cell'+cell.toString()+idSuffix[i]).style.display = 'none';
-    }    
-  }
+
+  drawProgram();
 }
 
 function deleteCommand(cmdNum){
   var idSuffix = ['fd','rt','bk','lt'];
-  act.program.splice(cmdNum,1);
-  for (var cell=0; cell<act.program.length; cell++){
-  	showCommand(act.program[cell],cell);
+  if (act.selected >= 0 && act.selected < act.program.length){
+  	act.program.splice(act.selected,1);//delete command
+  	drawProgram();
+  	stop();
   }
-  for (var cell=act.program.length; cell<allCommands; cell++){
-    for (var i=0; i<4; i++){
-         ge('cell'+cell.toString()+idSuffix[i]).style.display = 'none';
-    }    
-  }
-  if (cmdNum>0){
-  	highlightCommand(cmdNum-1);
-  	runFast(cmdNum-1);
-  	act.cmdExec = cmdNum-1;
-  	act.selected = cmdNum-1;
-  }
-  else{//go to start without deleting the program
-	act.position = [0,4];
-	act.orientation = FD;
-	act.cmdExec =  0;
-	act.play = false;
-	act.pause = false;
-	act.selected = -1;
-  setOrientation();
-  setSquare();
-  highlightCommand(-1);
-  clearTrace();
-  }
-  stop();
 }
 
 function setSquare(){
@@ -207,17 +209,18 @@ function setOrientation(){
 }
 
 
-function marginsToCanvas(marginTop,marginLeft){
+function marginsToCanvas(){
   //margins are in ems
   point = {};
-  marginTop = parseInt(marginTop);
-  marginLeft = parseInt(marginLeft);
+  marginTop = parseInt(ge('eprobot').style.marginTop);
+  marginLeft = parseInt(ge('eprobot').style.marginLeft);
   point.y = marginTop/6*30 + 15;
   point.x = marginLeft/6*43 + 21.5;//must be the scaling
   return(point);
 }
 
-function positionToCanvas(position){
+function positionToCanvas(){
+  position = act.position;
   point = {};
   point.y = position[1]*30 + 15;
   point.x = position[0]*43 + 21.5;
@@ -244,6 +247,41 @@ function trace(startpoint,endpoint){
     ctx.closePath();
   }
 }
+
+function moveSteps(curStep,startPos,endPos,steps,hor,draw){
+	//returns true if move is done
+	startpoint = marginsToCanvas();
+	diff = (endPos-startPos)/steps;
+    if (Math.abs((startPos + curStep*diff - endPos)) < 0.01){
+      if (hor){
+        ge('eprobot').style.marginLeft = sformat("{}em",endPos);
+      }
+      else{
+        ge('eprobot').style.marginTop = sformat("{}em",endPos);
+      }
+      endpoint = marginsToCanvas();
+      if (draw){
+      	trace(startpoint,endpoint);
+      }
+      return(true);
+    }
+    else{
+      if (hor){
+        ge('eprobot').style.marginLeft = sformat("{}em",startPos + curStep*diff);
+      }
+      else{
+       ge('eprobot').style.marginTop = sformat("{}em",startPos + curStep*diff); 
+      }
+      endpoint = marginsToCanvas();
+      if (draw){
+      	trace(startpoint,endpoint);
+  	  }
+      return(false);
+  	}
+
+}
+
+
 function animationNo(curPos,dir,hor){
   /*animation with set interval 
     curPos is in ems
@@ -261,65 +299,28 @@ function animationNo(curPos,dir,hor){
     endPos = curPos - 3;
   }
   var startPos = curPos;
-  var diff = (endPos - startPos)/5;
-  let i=0; 
+  steps = 5;
+  let i = 0;
   inter1 = setInterval(function(){
-      if (act.play){
-        if (Math.abs((startPos + i*diff - endPos)) < 0.01){
-          if (hor){
-            ge('eprobot').style.marginLeft = sformat("{}em",endPos);
-          }
-          else{
-            ge('eprobot').style.marginTop = sformat("{}em",endPos);
-          }
-          clearInterval(inter1);
-        }
-        else{
-          if (hor){
-            ge('eprobot').style.marginLeft = sformat("{}em",startPos + i*diff);
-          }
-          else{
-           ge('eprobot').style.marginTop = sformat("{}em",startPos + i*diff); 
-          }
-          i++;
-      }
-    }
+  	if (moveSteps(i,startPos,endPos,steps,hor,false)){
+  		clearInterval(inter1);
+  	}
+  	else{
+  		i++;
+  	}
   },100);
   setTimeout(function(){
-  //go back
-  startPos = endPos;
-  endPos = curPos;
-  diff = (endPos - startPos) / 5;
-  inter2 = setInterval(function(){
-    if (act.play){
-      if (Math.abs((startPos + i*diff - endPos)) < 0.01){
-        if (hor){
-          ge('eprobot').style.marginLeft = sformat("{}em",endPos);
-        }
-        else{
-          ge('eprobot').style.marginTop = sformat("{}em",endPos);
-        }
-        clearInterval(inter2);
-        if (act.cmdExec < act.program.length){
-          act.cmdExec += 1
-          if (!act.pause){
-            setTimeout(nextCommand,100);}
-        }
-      }
-      else{
-        if (hor){
-          ge('eprobot').style.marginLeft = sformat("{}em",startPos + i*diff);
-        }
-        else{
-         ge('eprobot').style.marginTop = sformat("{}em",startPos + i*diff); 
-        }
-        i++;
-    }
-  }
-},100);
-},500);
-
-
+  	let i = 0;
+  	inter2 = setInterval(function(){
+  	if (moveSteps(i,endPos,startPos,steps,hor,false)){
+  		clearInterval(inter2);
+   		nextCommand();
+  	}
+  	else{
+  		i++;
+  	}
+  },100);
+  },500);
 }
 
 function animationSi(startPos,endPos,hor){
@@ -329,54 +330,32 @@ function animationSi(startPos,endPos,hor){
     when hor = true marginLeft
     when hor = false marginTop
   */
-
-  var diff = (endPos - startPos)/10;
-  let i=0; 
-  inter = setInterval(function(){
-    if (act.play){
-      startpoint = marginsToCanvas(ge('eprobot').style.marginTop,ge('eprobot').style.marginLeft);
-      if (Math.abs((startPos + i*diff - endPos)) < 0.01){
-        if (hor){
-          ge('eprobot').style.marginLeft = sformat("{}em",endPos);
-        }
-        else{
-          ge('eprobot').style.marginTop = sformat("{}em",endPos);
-        }
+  	steps = 10;
+  	let i = 0;
+  	inter = setInterval(function(){
+    if (moveSteps(i,startPos,endPos,steps,hor,true)){
         clearInterval(inter);
-        if (act.cmdExec < act.program.length){
-          act.cmdExec += 1
-          if (!act.pause){
-            setTimeout(nextCommand,100);
-          }
-        }
+        nextCommand();
       }
       else{
-        if (hor){
-          ge('eprobot').style.marginLeft = sformat("{}em",startPos + i*diff);
-        }
-        else{
-         ge('eprobot').style.marginTop = sformat("{}em",startPos + i*diff); 
-        }
-        i++;
-    }
-    endpoint = marginsToCanvas(ge('eprobot').style.marginTop,ge('eprobot').style.marginLeft);
-    trace(startpoint,endpoint);
-  }
-},100);
+      	i++;
+      }
+	},100);
 }
+
 function animationAn(startAngle,endAngle,clock){
   /*angle animation startAngle and endAngle are in FD,LT,RT,BK format*/
   var startAngleDeg,endAngleDeg;
   switch (startAngle){
-    case FD: startAngleDeg = 0; break;
+    case UP: startAngleDeg = 0; break;
     case RT: startAngleDeg = 90; break;
-    case BK: startAngleDeg = 180; break;
+    case DN: startAngleDeg = 180; break;
     case LT: startAngleDeg = 270; break;
   }
   switch (endAngle){
-    case FD: endAngleDeg = 0; break;
+    case UP: endAngleDeg = 0; break;
     case RT: endAngleDeg = 90; break;
-    case BK: endAngleDeg = 180; break;
+    case DN: endAngleDeg = 180; break;
     case LT: endAngleDeg = 270; break;
   }
   var diff;
@@ -389,26 +368,15 @@ function animationAn(startAngle,endAngle,clock){
 
   let i=0; 
   inter = setInterval(function(){
-      newAngle = startAngleDeg + i*diff;
-      if (Math.abs((360 + startAngleDeg + i*diff)%360 - endAngleDeg) < 0.01){
-        ge('eprobot').style.transform = sformat('rotate({}deg)',endAngleDeg);
-        clearInterval(inter);
-        if (act.cmdExec < act.program.length){
-          act.cmdExec += 1
-          if (!act.pause){
-            setTimeout(nextCommand,100);
-          }
-        }
-        else{
-          highlightCommand(-1);
-          act.play = false;
-          act.selected = -1;
-          act.outofplace = true;
-        }
-      }
-      else{
-        ge('eprobot').style.transform = sformat('rotate({}deg)',startAngleDeg + i*diff);
-        i++;
+    newAngle = startAngleDeg + i*diff;
+    if (Math.abs((360 + startAngleDeg + i*diff)%360 - endAngleDeg) < 0.01){
+      ge('eprobot').style.transform = sformat('rotate({}deg)',endAngleDeg);
+      clearInterval(inter);
+      nextCommand();
+    }
+    else{
+      ge('eprobot').style.transform = sformat('rotate({}deg)',startAngleDeg + i*diff);
+      i++;
     }
   },100);
 }
@@ -446,41 +414,54 @@ function moveLeft(){
   }
 }
 
+function setProgramState(state){
+	switch (state){
+		case ENDOFPROGRAM:
+			highlightCommand(-1);
+			act.play = false;
+      		act.cmdExec = 0;
+      		act.position = [0,4];
+      		act.orientation = FD;
+      		act.selected = -1;
+      		act.outofplace = true;
+      		break;
+      	case STOP:
+      		highlightCommand(-1);
+      		act.play = false;
+      		act.cmdExec = 0;
+      		act.position = [0,4];
+      		act.orientation = FD;
+      		act.selected = -1;
+      		act.outofplace = false;
+      		break;
+	}
+}
+
+
 function nextCommand(){
-  if (act.play){
-    if (act.cmdExec == 0){
-      clearTrace();
-    }
-    setSquare();
-    setOrientation();
+  if (act.play && !act.pause){
+  	if (act.cmdExec == act.program.length){
+      setProgramState(ENDOFPROGRAM);
+  	  return(0);// end of program
+  	}
+    highlightCommand(act.cmdExec);
+    act.selectd = act.cmdExec;
     cmdCode = act.program[act.cmdExec];
-    if (act.cmdExec<act.program.length)
-      {highlightCommand(act.cmdExec);
-      }
-    else{
-      highlightCommand(-1);
-      act.play = false;
-      act.cmdExec = 0;
-      act.position = [0,4];
-      act.orientation = FD;
-      act.selected = -1;
-      act.outofplace = true;
-    }
     switch (cmdCode){
       case FD:
         switch (act.orientation){
-          case FD: moveUp(); break;
+          case UP: moveUp(); break;
           case RT: moveRight(); break;
           case LT: moveLeft(); break;
-          case BK: moveDown(); break;
+          case DN: moveDown(); break;
         }
       break;
       case BK:
         switch (act.orientation){
-          case FD: moveDown(); break;
+          case UP: moveDown(); break;
           case RT: moveLeft(); break;
           case LT: moveRight(); break;
-          case BK: moveUp(); break;
+          case DN: moveUp(); break;
         }    
       break;
       case RT:
@@ -496,36 +477,23 @@ function nextCommand(){
         animationAn(startAngle,endAngle,false);
       break;
     }
+    act.cmdExec++;
   }
 }
 
 function restart(){
-    act = {
-      program: [],
-      position: [0,4],
-      orientation: FD,
-      cmdExec: 0,
-      play: false,//play means that the program is executed but may be it is paused
-      pause: false,
-      selected: -1,
-    }
-    setOrientation();
+	deleteProgram();
+	setProgramState(STOP);
+	setOrientation();
     setSquare();
-    deleteProgram();
     highlightCommand(-1);//-1 means none
     clearTrace();
 }
 
 function stop(){
-  act.position = [0,4];
-  act.orientation = FD;
-  act.cmdExec = 0;
-  act.play = false;//play means that the program is executed but may be it is paused
-  act.pause = false;
-  act.selected = -1;
+  setProgramState(STOP);
   setOrientation();
   setSquare();
-  highlightCommand(-1);//-1 means none
   clearTrace();
   clearInterval(inter);
   clearInterval(inter1);
@@ -535,15 +503,10 @@ function stop(){
 function runFast(currentCommand){
   if (!act.play || (act.play && act.pause)){
   	clearTrace();
-  	if (currentCommand == act.program.length - 1){
-  		act.outofplace = false;//if user clicks on last command
-  		                       //ladybug and commands are in
-  		                       //harmony
-  	}
     act.position = [0,4];
     act.orientation = FD;
     for (i=0; i<=currentCommand; i++){
-      startpoint = positionToCanvas(act.position);
+      startpoint = positionToCanvas();
       switch (act.program[i]){
         case FD:
           switch (act.orientation){
@@ -568,13 +531,12 @@ function runFast(currentCommand){
           act.orientation = (act.orientation + 3) % 4;
         break;
       }
-      endpoint = positionToCanvas(act.position);
+      endpoint = positionToCanvas();
       trace(startpoint,endpoint);
     }
     setSquare();
     setOrientation();
     act.cmdExec = currentCommand+1;
-    highlightCommand(currentCommand);
   }
 }
 
@@ -608,25 +570,35 @@ function init(){
     //act.position = [0,4];
     //act.orientation = FD;
     //act.cmdExec = 0;
-    if (!act.play || (act.play && act.pause)){
-    act.play = true;
-    act.pause = false;
-    setTimeout(nextCommand,100);
+    if (!act.play){
+    	if (act.outofplace){
+    		act.cmdExec = 0;
+    		clearTrace();
+    	}
+	    act.play = true;
+	    act.pause = false;
+	    setSquare();
+	    setOrientation();
+	    setTimeout(nextCommand,100);
+    }
+    else{
+    	if (act.pause){
+		    act.play = true;
+		    act.pause = false;
+		    setSquare();
+		    setOrientation();
+		    setTimeout(nextCommand,100);
+    	}
     }
   });
   
 
-  ge('cdelete1').addEventListener('click',function(){
-    if (act.selected>=0 && act.selected<act.program.length){
-      deleteCommand(act.selected);
-    }
-  });
+  ge('cdelete1').addEventListener('click',deleteCommand);
 
   ge('cdelete').addEventListener('click',restart);
 
-  ge('cstop').addEventListener('click',function(){
-      stop();
-  });
+  ge('cstop').addEventListener('click',stop);
+
   ge('cpause').addEventListener('click',function(){
     act.selected = act.cmdExec;
     act.pause = true;
@@ -638,11 +610,11 @@ function init(){
         if (act.pencil){
           ge('cpencil').src = "resource/pencil-on.svg";
           if (act.outofplace){
-          	runFast(act.program.length - 1);
+          	runFast(act.program.length-1);
           }
           else{
-          	runFast(act.cmdExec-1);
-      	  }
+          	runFast(act.selected);
+          }
         }
         else{
           ge('cpencil').src = "resource/pencil-off.svg";
@@ -653,8 +625,11 @@ function init(){
   for (let i=0; i<allCommands; i++){
     ge('cell'+i.toString()).onclick = function(){
     	if (i<act.program.length){
-    		runFast(i); 
+    		runFast(i);
+    		highlightCommand(i);
     		act.selected = i;
+    		act.cmdExec = i + 1;
+    		act.outofplace = false;
     	}
     };
   }
@@ -679,6 +654,7 @@ function changeGrid(){
                "toys"  :"resource/toys.svg",
                "signs" :"resource/signs.svg",
                "shapes":"resource/shapes.svg",
+               "frouta":"resource/frouta.svg",
                "colors":"resource/colors.svg",
 }
   var s = ge('sel');
@@ -702,6 +678,4 @@ function changeChar(){
 
   ge('eprobot').src = im;
 }
-
-
 
