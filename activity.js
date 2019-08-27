@@ -478,6 +478,7 @@ function nextCommand(){
       break;
     }
     act.cmdExec++;
+    act.selected++;
   }
 }
 
@@ -505,6 +506,7 @@ function runFast(currentCommand){
   	clearTrace();
     act.position = [0,4];
     act.orientation = FD;
+    
     for (i=0; i<=currentCommand; i++){
       startpoint = positionToCanvas();
       switch (act.program[i]){
@@ -537,9 +539,9 @@ function runFast(currentCommand){
     setSquare();
     setOrientation();
     act.cmdExec = currentCommand+1;
+    act.selected = currentCommand;
   }
 }
-
 
 
 function init(){
@@ -600,8 +602,8 @@ function init(){
   ge('cstop').addEventListener('click',stop);
 
   ge('cpause').addEventListener('click',function(){
-    act.selected = act.cmdExec;
     act.pause = true;
+    act.selected = act.cmdExec-1;
   });
   ge('cpencil').addEventListener('click',function(){
       if (!act.play || (act.play && act.pause)){
@@ -611,6 +613,7 @@ function init(){
           ge('cpencil').src = "resource/pencil-on.svg";
           if (act.outofplace){
           	runFast(act.program.length-1);
+          	setProgramState(ENDOFPROGRAM);
           }
           else{
           	runFast(act.selected);
