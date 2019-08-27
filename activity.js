@@ -109,6 +109,8 @@ const DN = 2; //down
 
 const ENDOFPROGRAM = 0;
 const STOP = 1;
+const PLAYING = 2;
+const PAUSED = 3
 
 const idSuffix = ['fd','rt','bk','lt'];
 
@@ -186,12 +188,14 @@ function deleteProgram(){
 }
 
 function deleteCommand(cmdNum){
-  var idSuffix = ['fd','rt','bk','lt'];
-  if (act.selected >= 0 && act.selected < act.program.length){
-  	act.program.splice(act.selected,1);//delete command
-  	drawProgram();
-  	stop();
-  }
+  	if (!act.play || (act.play && act.pause)){
+		var idSuffix = ['fd','rt','bk','lt'];
+		if (act.selected >= 0 && act.selected < act.program.length){
+			act.program.splice(act.selected,1);//delete command
+			drawProgram();
+			stop();
+		}
+	}
 }
 
 function setSquare(){
@@ -416,6 +420,20 @@ function moveLeft(){
 
 function setProgramState(state){
 	switch (state){
+		case PLAYING:
+			act.play = true;
+			act.pause = false;
+			ge('cdelete1').style.cursor = 'default';
+			ge('cdelete').style.cursor = 'default';
+			ge('cpencil').style.cursor = 'default'
+			break;
+		case PAUSED:
+			act.play = true;
+			act.pause = true;
+			ge('cdelete1').style.cursor = 'pointer';
+			ge('cdelete').style.cursor = 'pointer';
+			ge('cpencil').style.cursor = 'pointer';
+			break;
 		case ENDOFPROGRAM:
 			highlightCommand(-1);
 			act.play = false;
@@ -424,6 +442,9 @@ function setProgramState(state){
       		act.orientation = FD;
       		act.selected = -1;
       		act.outofplace = true;
+			ge('cdelete1').style.cursor = 'pointer';
+			ge('cdelete').style.cursor = 'pointer';
+			ge('cpencil').style.cursor = 'pointer';
       		break;
       	case STOP:
       		highlightCommand(-1);
@@ -433,6 +454,10 @@ function setProgramState(state){
       		act.orientation = FD;
       		act.selected = -1;
       		act.outofplace = false;
+      		ge('cdelete1').style.cursor = 'pointer';
+			ge('cdelete').style.cursor = 'pointer';
+			ge('cpencil').style.cursor = 'pointer';
+
       		break;
 	}
 }
@@ -540,6 +565,7 @@ function runFast(currentCommand){
     setOrientation();
     act.cmdExec = currentCommand+1;
     act.selected = currentCommand;
+    setProgramState(PAUSED);
   }
 }
 
@@ -577,16 +603,14 @@ function init(){
     		act.cmdExec = 0;
     		clearTrace();
     	}
-	    act.play = true;
-	    act.pause = false;
+	    setProgramState(PLAYING);
 	    setSquare();
 	    setOrientation();
 	    setTimeout(nextCommand,100);
     }
     else{
     	if (act.pause){
-		    act.play = true;
-		    act.pause = false;
+		    setProgramState(PLAYING);
 		    setSquare();
 		    setOrientation();
 		    setTimeout(nextCommand,100);
@@ -597,12 +621,16 @@ function init(){
 
   ge('cdelete1').addEventListener('click',deleteCommand);
 
-  ge('cdelete').addEventListener('click',restart);
+  ge('cdelete').addEventListener('click',function(){
+  	if (!act.play || (act.play && act.pause)){
+  		restart();
+  	}
+  });
 
   ge('cstop').addEventListener('click',stop);
 
   ge('cpause').addEventListener('click',function(){
-    act.pause = true;
+  	setProgramState(PAUSED);
     act.selected = act.cmdExec-1;
   });
   ge('cpencil').addEventListener('click',function(){
