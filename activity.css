@@ -117,21 +117,21 @@ body {
   cursor:pointer;  
 }
 #up{
-  background-color:#ffffff77;
+  background-color: rgba(255,255,255,0.5);
   display:inline-block;
   float:left;
   overflow: auto;
   width:8em;
 }
 #middle{
-  background-color:#ffffff77;
+  background-color:rgba(255,255,255,0.5);
   display:inline-block;
   float:left;
   overflow: auto;
   width:8em;
 }
 #down{
-  background-color:#ffffff77;	
+  background-color:rgba(255,255,255,0.5);	
   display:inline-block;
   float:left;
   overflow: auto;
@@ -173,7 +173,7 @@ body {
 }
 
 #program{
-  background-color:#00000077;
+  background-color:rgba(0,0,0,0.5);
   display:inline-block;
   height: 32em;
   width: 10em;

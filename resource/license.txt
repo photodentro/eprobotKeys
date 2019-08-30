@@ -18,6 +18,10 @@ toys.svg
 signs.svg
 shapes.svg
 colors.svg
+flags.svg
+flowers.svg
+greece.svg
+monuments.svg
 
 
 Copyright: 2018 Artemis Gergopoulou, Georgios Piskopanis

@@ -677,16 +677,21 @@ if (document.readyState === 'loading') {
 
 
 function changeGrid(){
-  var grids = {"empty" :"resource/grid.svg",
-               "alpha" :"resource/alphabet.svg",
-               "dice"  :"resource/dice.svg",
-               "school":"resource/school.svg",
-               "instr" :"resource/instr.svg",
-               "toys"  :"resource/toys.svg",
-               "signs" :"resource/signs.svg",
-               "shapes":"resource/shapes.svg",
-               "frouta":"resource/frouta.svg",
-               "colors":"resource/colors.svg",
+  var grids = {"empty"    :"resource/grid.svg",
+               "alpha"    :"resource/alphabet.svg",
+               "dice"     :"resource/dice.svg",
+               "school"   :"resource/school.svg",
+               "instr"    :"resource/instr.svg",
+               "toys"     :"resource/toys.svg",
+               "signs"    :"resource/signs.svg",
+               "shapes"   :"resource/shapes.svg",
+               "frouta"   :"resource/frouta.svg",
+               "colors"   :"resource/colors.svg",
+               "monuments":"resource/monuments.svg",
+               "greece"   :"resource/greece.svg",
+               "flags"    :"resource/flags.svg",
+               "flowers"  :"resource/flowers.svg",
+               "playground":"resource/playground.svg",
 }
   var s = ge('sel');
   var i = s.selectedIndex;
