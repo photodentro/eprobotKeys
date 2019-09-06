@@ -71,10 +71,14 @@ function onHome(event) {
 
 function onHelp(event) {
   ge('help').style.display = 'flex';
+  ge('audiohelp').currentTime = 0;
+  ge('audiohelp').play();
+
 }
 
 function onHelpHide(event) {
   ge('help').style.display = '';
+  ge('audiohelp').pause();
 }
 
 function onAbout(event) {
@@ -96,9 +100,17 @@ function onFullScreen(event) {
     cancelFullScreen.call(doc);
   }
 }
+function setAnimation(eleName,aniName,aniDur){
+  /* Code for Chrome, Safari, and Opera */
+  ge(eleName).classList.add(aniName);
+  ge(eleName).style.animationName = aniName;
+  ge(eleName).style.animationDuration = aniDur;
+}
 
 //--------------------------------------END OF VISUAL----------------------------
 //--------------------------------------START LOGIC------------------------------
+var maze = false;
+var levels = false;
 const FD = 0;
 const RT = 1;
 const BK = 2;
@@ -106,6 +118,12 @@ const LT = 3;
 
 const UP = 0;
 const DN = 2; //down
+
+const NORTH = 1
+const WEST = 2
+const SOUTH = 4
+const EAST = 8
+const SET = 16
 
 const ENDOFPROGRAM = 0;
 const STOP = 1;
@@ -163,7 +181,7 @@ function highlightCommand(i){
 function bindCommand(cmdName,cmdCode){
   ge(cmdName).onclick = function(event){
     if (!act.play || (act.play && act.pause)){//only add command if not in play
-    	if (act.selected==-1){//add to end
+    	if (act.selected==-1 || (ge('cdelete1') == undefined)){//add to end
       		if (act.program.length<allCommands){
         		cell = act.program.length;
         		act.program.push(cmdCode);
@@ -236,6 +254,9 @@ function clearTrace(){
   c = ge('mycanvas');
   ctx = c.getContext('2d');
   ctx.clearRect(0,0,c.width,c.height);
+  if (maze){
+  	drawMazeonCanvas();
+  }
 }
 
 function trace(startpoint,endpoint){
@@ -297,10 +318,10 @@ function animationNo(curPos,dir,hor){
   */
   var endPos;
   if (dir){
-    endPos = curPos + 3; //grid is 6em 3em is half block of grid
+    endPos = curPos + 1.5; //grid is 6em 1.5em is 1/4 of block of grid
   }
   else{
-    endPos = curPos - 3;
+    endPos = curPos - 1.5;
   }
   var startPos = curPos;
   steps = 5;
@@ -339,6 +360,12 @@ function animationSi(startPos,endPos,hor){
   	inter = setInterval(function(){
     if (moveSteps(i,startPos,endPos,steps,hor,true)){
         clearInterval(inter);
+        if (maze && ge('exit')){
+          if (act.position[0] == act.exit[0] && act.position[1] == act.exit[1]){
+            setAnimation('exit','success','2s');
+            setTimeout(function(){setAnimation('exit','reset','0s'); stop();},2100);
+          }
+        }
         nextCommand();
       }
       else{
@@ -385,8 +412,19 @@ function animationAn(startAngle,endAngle,clock){
   },100);
 }
 
+function canMove(d){
+  //direction is NORTH,SOUTH,WEST,EAST
+  if (maze){
+  	return(!(g.maze[getId(act.position[0],4-act.position[1])]&d));
+  }
+  else{
+  	return(true);//no obstacles if not in maze
+  }
+      
+}
+
 function moveUp(){
-  if (act.position[1] > 0){
+  if (act.position[1] > 0 && canMove(SOUTH)){//maze is drawn upside down
     animationSi(act.position[1]*6,(--act.position[1])*6,false);
   }
   else{
@@ -394,7 +432,7 @@ function moveUp(){
   }
 }
 function moveDown(){
-  if (act.position[1] < 4){
+  if (act.position[1] < 4 && canMove(NORTH)){//maze is drawn upside down
     animationSi(act.position[1]*6,(++act.position[1])*6,false);
   }
   else{
@@ -402,7 +440,7 @@ function moveDown(){
   }
 }
 function moveRight(){
-  if (act.position[0] < 6){//grid is 6 cells wide
+  if (act.position[0] < 6 && canMove(EAST)){//grid is 6 cells wide
     animationSi(act.position[0]*6.1,(++act.position[0])*6.1,true);
   }
   else{
@@ -410,7 +448,7 @@ function moveRight(){
   }
 }
 function moveLeft(){
- if (act.position[0] > 0){
+ if (act.position[0] > 0 && canMove(WEST)){
     animationSi(act.position[0]*6.1,(--act.position[0])*6.1,true);
   } 
   else{
@@ -418,19 +456,21 @@ function moveLeft(){
   }
 }
 
-function setProgramState(state){
+function setProgramState(state,dir){
 	switch (state){
 		case PLAYING:
 			act.play = true;
 			act.pause = false;
-			ge('cdelete1').style.cursor = 'default';
+      if (ge('cdelete1')){
+			   ge('cdelete1').style.cursor = 'default';}
 			ge('cdelete').style.cursor = 'default';
 			ge('cpencil').style.cursor = 'default'
 			break;
 		case PAUSED:
 			act.play = true;
 			act.pause = true;
-			ge('cdelete1').style.cursor = 'pointer';
+			if (ge('cdelete1')){
+         ge('cdelete1').style.cursor = 'pointer';}
 			ge('cdelete').style.cursor = 'pointer';
 			ge('cpencil').style.cursor = 'pointer';
 			break;
@@ -439,10 +479,11 @@ function setProgramState(state){
 			act.play = false;
       		act.cmdExec = 0;
       		act.position = [0,4];
-      		act.orientation = FD;
+      		act.orientation = DIR;
       		act.selected = -1;
       		act.outofplace = true;
-			ge('cdelete1').style.cursor = 'pointer';
+			if (ge('cdelete1')){
+         ge('cdelete1').style.cursor = 'pointer';}
 			ge('cdelete').style.cursor = 'pointer';
 			ge('cpencil').style.cursor = 'pointer';
       		break;
@@ -451,13 +492,14 @@ function setProgramState(state){
       		act.play = false;
       		act.cmdExec = 0;
       		act.position = [0,4];
-      		act.orientation = FD;
+      		act.orientation = DIR;
       		act.selected = -1;
       		act.outofplace = false;
-      		ge('cdelete1').style.cursor = 'pointer';
+      if (ge('cdelete1')){
+        ge('cdelete1').style.cursor = 'pointer';  
+      }
 			ge('cdelete').style.cursor = 'pointer';
 			ge('cpencil').style.cursor = 'pointer';
-
       		break;
 	}
 }
@@ -530,25 +572,25 @@ function runFast(currentCommand){
   if (!act.play || (act.play && act.pause)){
   	clearTrace();
     act.position = [0,4];
-    act.orientation = FD;
+    act.orientation = DIR;
     
     for (i=0; i<=currentCommand; i++){
       startpoint = positionToCanvas();
       switch (act.program[i]){
         case FD:
           switch (act.orientation){
-            case FD: if (act.position[1]>0) act.position[1]--; break;
-            case RT: if (act.position[0]<6) act.position[0]++; break;//grid is 6 cells wide
-            case LT: if (act.position[0]>0) act.position[0]--; break;
-            case BK: if (act.position[1]<4) act.position[1]++; break;
+            case FD: if (act.position[1]>0 && canMove(SOUTH)) act.position[1]--; break;
+            case RT: if (act.position[0]<6 && canMove(EAST) ) act.position[0]++; break;//grid is 6 cells wide
+            case LT: if (act.position[0]>0 && canMove(WEST) ) act.position[0]--; break;
+            case BK: if (act.position[1]<4 && canMove(NORTH)) act.position[1]++; break;
           }
         break;
         case BK:
           switch (act.orientation){
-            case FD: if (act.position[1]<4) act.position[1]++; break;
-            case RT: if (act.position[0]>0) act.position[0]--; break;
-            case LT: if (act.position[0]<6) act.position[0]++; break;//grid is 6 cells wide
-            case BK: if (act.position[1]>0) act.position[1]--; break;
+            case FD: if (act.position[1]<4 && canMove(NORTH)) act.position[1]++; break;
+            case RT: if (act.position[0]>0 && canMove(WEST)) act.position[0]--; break;
+            case LT: if (act.position[0]<6 && canMove(EAST)) act.position[0]++; break;//grid is 6 cells wide
+            case BK: if (act.position[1]>0 && canMove(SOUTH)) act.position[1]--; break;
           }    
         break;
         case RT:
@@ -569,14 +611,40 @@ function runFast(currentCommand){
   }
 }
 
+function initLevel(){
+    ge('level').innerHTML = act.level + 1;
+    setAnimation('exit','reset','0s');
+    newLevel(act.level);
+    act.position = [0,4];
+    act.orientation = DIR;
+    setSquare();
+    setOrientation();
+    deleteProgram();
+    highlightCommand(-1);
+    act.play = false;
+  }
 
-function init(){
+function onMenuNext(){
+    act.level = (act.level+1)%6;
+    initLevel();
+}
+
+function init(maze,levels){
+  //if maze is true then there is no background
+  //and there is canvas
+
+  //if levels there are levels
+
   // Internal level number is zero-based; but we display it as 1-based.
   // We allow/fix newLevel if it's outside its proper range.
   onResize();
   // Create a <style> element for animations, to avoid CORS issues on Chrome
   // TODO: dynamically? document.head.appendChild(document.createElement('style'));
   // Install event handlers
+  if (ge('sel')){
+  	ge('sel').selectedIndex = 0;//fix selected index after refresh
+  }
+
   document.body.onresize = onResize;
   ge('bar_home').onclick = onHome;
   ge('bar_help').onclick = onHelp;
@@ -586,8 +654,28 @@ function init(){
   for (i = 0; i < document.images.length; i += 1) {
     document.images[i].ondragstart = doPreventDefault;
   }
+  if (levels){
+  	act.level = 0;
+    ge('bar_next').onclick = onMenuNext;
+    ge('bar_previous').onclick = function(){
+      act.level = (act.level+5)%6;
+      initLevel();
+      };
+    ge('level').innerHTML = act.level + 1;
+  }
 
   restart();
+  if (maze){
+    newMaze();
+    ge('newmaze').addEventListener('click',function(){
+       newMaze();
+       if (levels){
+       	ge('level').innerHTML = act.level + 1;
+       }
+  });
+
+  }
+
 
   bindCommand('cforward',FD);
   bindCommand('cbackward',BK);
@@ -595,9 +683,6 @@ function init(){
   bindCommand('cright',RT);
 
   ge('cgo').addEventListener('click',function(event){
-    //act.position = [0,4];
-    //act.orientation = FD;
-    //act.cmdExec = 0;
     if (!act.play){
     	if (act.outofplace){
     		act.cmdExec = 0;
@@ -618,8 +703,8 @@ function init(){
     }
   });
   
-
-  ge('cdelete1').addEventListener('click',deleteCommand);
+  if (ge('cdelete1')){
+  ge('cdelete1').addEventListener('click',deleteCommand);}
 
   ge('cdelete').addEventListener('click',function(){
   	if (!act.play || (act.play && act.pause)){
@@ -664,10 +749,15 @@ function init(){
     	}
     };
   }
+  ge('main').style.display = "";
+  ge('loading').style.display = "none";
+
 }
 
+
+window.onload = function(){init(maze,levels)};
 window.onerror = onError;
-window.onload = init;
+
 // Call onResize even before the images are loaded
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', onResize);
@@ -677,21 +767,27 @@ if (document.readyState === 'loading') {
 
 
 function changeGrid(){
-  var grids = {"empty"    :"resource/grid.svg",
-               "alpha"    :"resource/alphabet.svg",
-               "dice"     :"resource/dice.svg",
-               "school"   :"resource/school.svg",
-               "instr"    :"resource/instr.svg",
-               "toys"     :"resource/toys.svg",
-               "signs"    :"resource/signs.svg",
-               "shapes"   :"resource/shapes.svg",
-               "frouta"   :"resource/frouta.svg",
-               "colors"   :"resource/colors.svg",
-               "monuments":"resource/monuments.svg",
-               "greece"   :"resource/greece.svg",
-               "flags"    :"resource/flags.svg",
-               "flowers"  :"resource/flowers.svg",
-               "playground":"resource/playground.svg",
+  var grids = {"empty"    		:"resource/grid.svg",
+               "alpha"    		:"resource/alphabet.svg",
+               "alphanotext"	:"resource/alphabet_notext.svg",
+               "dice"     		:"resource/dice.svg",
+               "school"   		:"resource/school.svg",
+               "instrtext"    	:"resource/instr.svg",
+               "instr"			:"resource/instr_notext.svg",
+               "toys"    		:"resource/toys.svg",
+               "signs"    		:"resource/signs.svg",
+               "shapestext"   	:"resource/shapes.svg",
+               "shapes"			:"resource/shapes_notext.svg",
+               "froutatext"   	:"resource/frouta.svg",
+               "frouta"			:"resource/frouta_notext.svg",
+               "colorstext"   	:"resource/colors.svg",
+               "colors"			:"resource/colors_notext.svg",
+               "monuments"		:"resource/monuments.svg",
+               "greekmonuments" :"resource/greekmonuments.svg",
+               "greece"   		:"resource/greece.svg",
+               "flags"    		:"resource/flags.svg",
+               "flowers"  		:"resource/flowers.svg",
+               "playground"		:"resource/playground.svg",
 }
   var s = ge('sel');
   var i = s.selectedIndex;
